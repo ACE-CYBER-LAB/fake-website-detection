@@ -9,7 +9,10 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 # Google Safe Browsing API Key (Replace with your actual key)
-GOOGLE_API_KEY = "YOUR_GOOGLE_SAFE_BROWSING_API_KEY"
+GOOGLE_API_KEY = "AIzaSyB7yvEgaftZFG6KgngHRuPUfvEBfycDg6A"
+
+# VirusTotal API Key (Replace with your actual key)
+VIRUSTOTAL_API_KEY = "80305c9b6fdde681bd97caa45494e34010dfb4f1e2141adf7abcd0e83a36f2cf"
 
 # Function to check WHOIS domain age
 def get_domain_info(domain):
@@ -65,6 +68,25 @@ def analyze_website_content(domain):
     except Exception:
         return "Could not analyze website content"
 
+# Function to check VirusTotal blacklist
+def check_virustotal(domain):
+    url = f"https://www.virustotal.com/api/v3/domains/{domain}"
+    headers = {
+        "x-apikey": VIRUSTOTAL_API_KEY
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        if "data" in data and "attributes" in data["data"]:
+            malicious_votes = data["data"]["attributes"]["last_analysis_stats"]["malicious"]
+            if malicious_votes > 0:
+                return f"⚠️ Blacklisted by {malicious_votes} sources!"
+            else:
+                return "✅ Not Blacklisted"
+        return "Could not retrieve VirusTotal data"
+    except Exception as e:
+        return f"VirusTotal Check Failed: {e}"
+
 # Flask route for homepage
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -75,13 +97,15 @@ def home():
         ssl_status = check_ssl_certificate(domain)
         google_status = check_google_safety(domain)
         content_analysis = analyze_website_content(domain)
+        virustotal_status = check_virustotal(domain)
 
         result = {
             "domain": domain,
             "age": f"{age} days" if age else registrar,
             "ssl": ssl_status,
             "google_safety": google_status,
-            "content_analysis": content_analysis
+            "content_analysis": content_analysis,
+            "virustotal_status": virustotal_status
         }
     
     return render_template("index.html", result=result)
